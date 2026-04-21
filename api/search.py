@@ -26,7 +26,7 @@ COUNTRY_NAMES = {
 
 
 def get_auth_cookie():
-    password = os.environ.get("MIXPANEL_PASSWORD", "")
+    password = os.environ.get("MIXPANEL_PASSWORD", "").strip()
     body = json.dumps({"password": password}).encode()
     req = urllib.request.Request(VERIFY_URL, data=body, headers={
         "Content-Type": "application/json",
