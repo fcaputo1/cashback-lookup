@@ -1,21 +1,21 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
 import json
+import os
 import urllib.request
 
+BOARD_SLUG = "7CfN76Cf46duqFEhB6anMd"
+BOARD_UUID = "3237a7f0-4e70-4b46-9e75-a8533d6f7d38"
 MIXPANEL_URL = "https://mixpanel.com/api/app/public/dashboard-cards"
+VERIFY_URL = f"https://mixpanel.com/api/app/public/verify/{BOARD_UUID}/"
 MIXPANEL_BODY = json.dumps({
-    "uuid": "3237a7f0-4e70-4b46-9e75-a8533d6f7d38",
+    "uuid": BOARD_UUID,
     "bookmark_id": 89622898,
     "endpoint": "insights",
     "query_origin": "dashboard_public"
 }).encode()
-HEADERS = {
-    "Content-Type": "application/json",
-    "Origin": "https://mixpanel.com",
-    "Referer": "https://mixpanel.com/public/7CfN76Cf46duqFEhB6anMd",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-}
+UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
 COUNTRY_NAMES = {
     "AR": "Argentina", "BO": "Bolivia", "CL": "Chile", "CO": "Colombia",
     "CR": "Costa Rica", "DO": "República Dominicana", "EC": "Ecuador",
@@ -25,8 +25,34 @@ COUNTRY_NAMES = {
 }
 
 
+def get_auth_cookie():
+    password = os.environ.get("MIXPANEL_PASSWORD", "")
+    body = json.dumps({"password": password}).encode()
+    req = urllib.request.Request(VERIFY_URL, data=body, headers={
+        "Content-Type": "application/json",
+        "Origin": "https://mixpanel.com",
+        "Referer": f"https://mixpanel.com/public/{BOARD_SLUG}",
+        "User-Agent": UA,
+    })
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        raw = resp.getheader("Set-Cookie", "")
+        # Extract the auth token cookie
+        for part in raw.split(","):
+            part = part.strip()
+            if f"mp_public_link_auth_token:{BOARD_SLUG}" in part:
+                return part.split(";")[0].strip()
+    return ""
+
+
 def fetch_user(distinct_id):
-    req = urllib.request.Request(MIXPANEL_URL, data=MIXPANEL_BODY, headers=HEADERS)
+    auth_cookie = get_auth_cookie()
+    req = urllib.request.Request(MIXPANEL_URL, data=MIXPANEL_BODY, headers={
+        "Content-Type": "application/json",
+        "Origin": "https://mixpanel.com",
+        "Referer": f"https://mixpanel.com/public/{BOARD_SLUG}",
+        "User-Agent": UA,
+        "Cookie": auth_cookie,
+    })
     with urllib.request.urlopen(req, timeout=20) as resp:
         data = json.loads(resp.read())
 
