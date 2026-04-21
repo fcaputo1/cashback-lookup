@@ -35,13 +35,12 @@ def get_auth_cookie():
         "User-Agent": UA,
     })
     with urllib.request.urlopen(req, timeout=10) as resp:
-        raw = resp.getheader("Set-Cookie", "")
-        # Extract the auth token cookie
-        for part in raw.split(","):
-            part = part.strip()
-            if f"mp_public_link_auth_token:{BOARD_SLUG}" in part:
-                return part.split(";")[0].strip()
-    return ""
+        cookies = [
+            val.split(";")[0].strip()
+            for name, val in resp.getheaders()
+            if name.lower() == "set-cookie"
+        ]
+        return "; ".join(cookies)
 
 
 def fetch_user(distinct_id):
