@@ -72,7 +72,7 @@ def fetch_user(distinct_id):
     if not user_data:
         return None, "not_found"
 
-    country, actual_pct = "—", "—"
+    country, cashback_current, actual_pct = "—", "—", "—"
     for k, v in user_data.items():
         if k.startswith("$"):
             continue
@@ -82,6 +82,7 @@ def fetch_user(distinct_id):
         for cb, cb_val in v.items():
             if cb.startswith("$"):
                 continue
+            cashback_current = cb
             if isinstance(cb_val, dict):
                 for pct in cb_val:
                     if not pct.startswith("$") and pct != "undefined":
@@ -92,6 +93,7 @@ def fetch_user(distinct_id):
     return {
         "country": country,
         "country_name": COUNTRY_NAMES.get(country, country),
+        "cashback_current": cashback_current,
         "actual_pct": actual_pct,
     }, None
 

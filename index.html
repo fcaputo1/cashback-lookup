@@ -97,8 +97,10 @@ async function search() {
     } else if (data.error) {
       res.innerHTML = '<span class="inactive">⚠️ ' + data.error + '</span>';
     } else {
-      const pct = data.actual_pct && data.actual_pct !== '—'
-        ? (parseFloat(data.actual_pct) * 100).toFixed(0) + '%' : '—';
+      const rawPct = (data.actual_pct && data.actual_pct !== '—')
+        ? data.actual_pct : data.cashback_current;
+      const pct = rawPct && rawPct !== '—'
+        ? parseFloat(rawPct).toFixed(0) + '%' : '—';
       res.innerHTML = `
         <div>
           <div class="active" style="font-size:18px;font-weight:700;margin-bottom:18px;">✅ Cashback ACTIVO</div>
