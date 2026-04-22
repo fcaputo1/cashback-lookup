@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler
 from urllib.parse import parse_qs, urlparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import urllib.request
@@ -8,12 +9,7 @@ BOARD_SLUG = "7CfN76Cf46duqFEhB6anMd"
 BOARD_UUID = "3237a7f0-4e70-4b46-9e75-a8533d6f7d38"
 MIXPANEL_URL = "https://mixpanel.com/api/app/public/dashboard-cards"
 VERIFY_URL = f"https://mixpanel.com/api/app/public/verify/{BOARD_UUID}/"
-MIXPANEL_BODY = json.dumps({
-    "uuid": BOARD_UUID,
-    "bookmark_id": 89622898,
-    "endpoint": "insights",
-    "query_origin": "dashboard_public"
-}).encode()
+BOOKMARK_IDS = [89622898, 89646604, 89646606, 89646770, 89646850, 89646869, 89646917, 89646931, 89646959]
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 COUNTRY_NAMES = {
@@ -43,24 +39,36 @@ def get_auth_cookie():
         return "; ".join(cookies)
 
 
-def fetch_user(distinct_id):
-    auth_cookie = get_auth_cookie()
-    req = urllib.request.Request(MIXPANEL_URL, data=MIXPANEL_BODY, headers={
+def fetch_card(bid, auth_cookie):
+    body = json.dumps({
+        "uuid": BOARD_UUID,
+        "bookmark_id": bid,
+        "endpoint": "insights",
+        "query_origin": "dashboard_public"
+    }).encode()
+    req = urllib.request.Request(MIXPANEL_URL, data=body, headers={
         "Content-Type": "application/json",
         "Origin": "https://mixpanel.com",
         "Referer": f"https://mixpanel.com/public/{BOARD_SLUG}",
         "User-Agent": UA,
         "Cookie": auth_cookie,
     })
-    with urllib.request.urlopen(req, timeout=20) as resp:
+    with urllib.request.urlopen(req, timeout=30) as resp:
         data = json.loads(resp.read())
+    series = data["results"]["series"]["Uniques of Cashback Status Change"]
+    return {k: v for k, v in series.items() if not k.startswith("$")}
 
-    try:
-        series = data["results"]["series"]["Uniques of Cashback Status Change"]
-    except KeyError:
-        return None, "Estructura de datos inesperada."
 
-    user_data = series.get(distinct_id)
+def fetch_user(distinct_id):
+    auth_cookie = get_auth_cookie()
+
+    all_series = {}
+    with ThreadPoolExecutor(max_workers=9) as ex:
+        futures = {ex.submit(fetch_card, bid, auth_cookie): bid for bid in BOOKMARK_IDS}
+        for f in as_completed(futures):
+            all_series.update(f.result())
+
+    user_data = all_series.get(distinct_id)
     if not user_data:
         return None, "not_found"
 
